@@ -15,34 +15,34 @@ defmodule Streamers do
     end
   end
 
-  defp is_index?(file) do
-    File.open! file, fn(pid) ->
-      IO.read(pid, 25)  == "#EXTM3U\n#EXT-X-STREAM-INF"
-    end
-  end
-
   def extract_m3u8(index_file) do
     File.open! index_file, fn(pid) ->
       IO.readline(pid)
-      do_extract_m3u8(pid, [])
+      do_extract_m3u8(pid, Path.dirname(index_file), [])
     end
   end
 
-  defp do_extract_m3u8(pid, acc) do
+  defp do_extract_m3u8(pid, dir, acc) do
     case IO.readline(pid) do
       :eof -> Enum.reverse(acc)
       stream_inf ->
         path = IO.readline(pid)
-        do_extract_m3u8(pid, stream_inf, path, acc)
+        do_extract_m3u8(pid, dir, stream_inf, path, acc)
     end
   end
 
-  defp do_extract_m3u8(pid, stream_inf, path, acc) do
+  defp do_extract_m3u8(pid, dir, stream_inf, path, acc) do
     # #EXT-X-STREAM-INF:PROGRAM-ID=1,BANDWIDTH=110000
-
+    path = Path.join(dir, path |> String.strip)
     << "#EXT-X-STREAM-INF:PROGRAM-ID=", program_id, ",BANDWIDTH=", bandwidth :: binary  >> = stream_inf
     prog_id = binary_to_integer <<program_id>>
-    record = M3U8[program_id: prog_id, path: String.strip(path), bandwidth: String.strip bandwidth]
-    do_extract_m3u8(pid, [record|acc])
+    record = M3U8[program_id: prog_id, path: String.strip(path), bandwidth: binary_to_integer String.strip bandwidth]
+    do_extract_m3u8(pid, dir, [record|acc])
+  end
+
+  defp is_index?(file) do
+    File.open! file, fn(pid) ->
+      IO.read(pid, 25)  == "#EXTM3U\n#EXT-X-STREAM-INF"
+    end
   end
 end
